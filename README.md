@@ -11,7 +11,9 @@
 ```
 
 将提示词输入给Gemini2.5Pro最终输出参考：
-<a href="./README/file/Gemini输出的v0AI提示词">Gemini输出的v0AI提示词<a/>
+<br>
+<a href="./README/file/Gemini输出的v0AI提示词.md">Gemini输出的v0AI提示词<a/>
+
 
 ### 2.使用V0AI生成UI
 V0使用起来非常简单，没什么技术含量，就是简单的输入提示词，等待生成结束即可。
@@ -47,9 +49,11 @@ pnpm run dev
 2. 提示词：`帮我写一份完整的API接口文档`
 
 最终输出结果：
+<br>
 <a href="./README/file/幻想记录 (Fantasy Record) API 文档 (v1).md">幻想记录 (Fantasy Record) API 文档 (v1)</a>
 
 
 当前的v1文档基本上满足我们的需求，但是还有很多缺陷的部分，因为V0在生成UI时加入的一些附加功能我们没有告诉Gemini。这时候就要体现我们作为人类的作用了--结合着我们的前端页面进行接口文档的修改。 
 经过我的一番检查，果然发现了缺漏的接口：【本周情绪趋势】，【本月统计】，我立即让Gemini进行补充，于是我们便得到了：
+<br>
 <a href="./README/file/幻想记录 (Fantasy Record) API 文档 (v2).md">幻想记录 (Fantasy Record) API 文档 (v2)</a>
