@@ -1,3 +1,7 @@
 export default function Loading() {
-  return null
+  return (
+    <div>
+      加载中...
+    </div>
+  )
 }

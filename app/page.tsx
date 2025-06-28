@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,34 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, Search, TrendingUp, Lightbulb, Calendar } from "lucide-react"
 import Link from "next/link"
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from "recharts"
-
-// Mock data
-const recentRecords = [
-  {
-    id: 1,
-    title: "未来城市的智能交通系统",
-    content: "想象一个完全由AI控制的交通网络，每辆车都能与城市基础设施实时通信，实现零拥堵的理想状态...",
-    tags: ["软件灵感", "科幻", "AI"],
-    date: "2024-01-15 14:30",
-    mood: "🚀",
-  },
-  {
-    id: 2,
-    title: "梦中的图书馆",
-    content: "一个无限延伸的图书馆，每本书都记录着不同世界的故事，读者可以通过阅读进入那些世界...",
-    tags: ["故事片段", "奇幻"],
-    date: "2024-01-14 22:15",
-    mood: "🤔",
-  },
-  {
-    id: 3,
-    title: "个人时间管理助手",
-    content: "一个能够学习用户习惯的智能助手，不仅提醒任务，还能预测用户的情绪状态并调整工作节奏...",
-    tags: ["软件灵感", "生产力"],
-    date: "2024-01-13 09:45",
-    mood: "😃",
-  },
-]
+// import { useGetCookies } from "cookies-next"
 
 const moodData = [
   { day: "周一", mood: 7 },
@@ -47,17 +20,62 @@ const moodData = [
   { day: "周日", mood: 7 },
 ]
 
+const moodOptions = [
+  { emoji: "😃", value: "兴奋", color: "bg-yellow-500" },
+  { emoji: "🤔", value: "沉思", color: "bg-blue-500" },
+  { emoji: "😢", value: "悲伤", color: "bg-gray-500" },
+  { emoji: "🚀", value: "充满希望", color: "bg-green-500" },
+  { emoji: "❓", value: "困惑", color: "bg-purple-500" },
+]
+
 const filterOptions = ["全部", "软件灵感", "故事片段", "未来设想", "情绪宣泄"]
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("")
   const [activeFilter, setActiveFilter] = useState("全部")
+  const [recentRecords, setRecentRecords] = useState<any[]>([])
 
-  const filteredRecords = recentRecords.filter((record) => {
+  useEffect(() => {
+    const token = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('token='))
+    ?.split('=')[1];
+    fetch("http://localhost:3000/records", {
+      method: "GET",
+      headers: {
+        "Authorization": "Bearer " + token
+      },
+    })
+      .then(res => res.json())
+      .then(data => {
+        console.log(data);
+        
+        // 检查数据结构并处理 tags 字段
+        if (data && data.data && data.data.records && Array.isArray(data.data.records)) {
+          const processedRecords = data.data.records.map((record: any) => ({
+            ...record,
+            tags: record.tags 
+              ? (typeof record.tags === 'string' ? JSON.parse(record.tags) : record.tags)
+              : [],
+            content: record.snippet || record.content || '' // 使用 snippet 作为 content
+          }));
+          
+          setRecentRecords(processedRecords);
+        } else {
+          console.error('API响应数据格式错误:', data);
+          setRecentRecords([]);
+        }
+      })
+      .catch(error => {
+        console.error('获取记录失败:', error);
+      });
+  }, [])
+
+  const filteredRecords = recentRecords.filter((record: any) => {
     const matchesSearch =
-      record.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.content.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesFilter = activeFilter === "全部" || record.tags.includes(activeFilter)
+      record.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      record.content?.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesFilter = activeFilter === "全部" || record.tags?.includes(activeFilter)
     return matchesSearch && matchesFilter
   })
 
@@ -68,7 +86,7 @@ export default function Dashboard() {
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-6">
             {/* Header */}
-            <div className="space-y-4">
+            <div className="space-y-4 flex flex-col gap-2">
               <h1 className="text-3xl font-semibold text-foreground">欢迎回来，今天幻想了些什么？</h1>
 
               <Link href="/create">
@@ -108,19 +126,20 @@ export default function Dashboard() {
 
             {/* Records Grid */}
             <div className="grid gap-4">
-              {filteredRecords.map((record) => (
-                <Card key={record.id} className="glassmorphism border-0 hover:shadow-lg transition-all duration-300">
+              {filteredRecords.map((record: any) => (
+                <Link key={record.id} href={`/records/${record.id}`}>
+                <Card className="glassmorphism border-0 hover:shadow-lg transition-all duration-300">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <CardTitle className="text-lg font-medium text-foreground">{record.title}</CardTitle>
-                      <span className="text-2xl">{record.mood}</span>
+                      <span className="text-2xl">{moodOptions.find(option => option.value === record.mood)?.emoji}</span>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <p className="text-muted-foreground text-sm leading-relaxed">{record.content}</p>
                     <div className="flex items-center justify-between">
                       <div className="flex flex-wrap gap-1">
-                        {record.tags.map((tag) => (
+                        {record.tags?.map((tag: string) => (
                           <Badge key={tag} variant="secondary" className="text-xs">
                             {tag}
                           </Badge>
@@ -130,6 +149,7 @@ export default function Dashboard() {
                     </div>
                   </CardContent>
                 </Card>
+              </Link>
               ))}
             </div>
           </div>
@@ -148,7 +168,7 @@ export default function Dashboard() {
                 <div className="h-32">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={moodData}>
-                      <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
+                      <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
                       <YAxis hide />
                       <Line
                         type="monotone"

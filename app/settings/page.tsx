@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
@@ -9,7 +10,8 @@ import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Settings, Moon, Bell, Database, Shield, Palette, Save } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
+import { Settings, Moon, Bell, Database, Shield, Palette, Save, Download, Trash2 } from "lucide-react"
 
 export default function SettingsPage() {
   const [autoSave, setAutoSave] = useState(true)
