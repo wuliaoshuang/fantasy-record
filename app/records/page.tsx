@@ -1,98 +1,34 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Filter, Calendar, Tag } from "lucide-react"
+import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
+import { Search, Filter, Calendar, Tag, Edit } from "lucide-react"
 import Link from "next/link"
-
-const moodOptions = [
-  { emoji: "😃", value: "兴奋", color: "bg-yellow-500" },
-  { emoji: "🤔", value: "沉思", color: "bg-blue-500" },
-  { emoji: "😢", value: "悲伤", color: "bg-gray-500" },
-  { emoji: "🚀", value: "充满希望", color: "bg-green-500" },
-  { emoji: "❓", value: "困惑", color: "bg-purple-500" },
-]
+import { useRecords, useRecordFilters } from "@/hooks/use-records"
+import { formatDate, getMoodEmoji } from "@/lib/data-utils"
+import { SORT_OPTIONS } from "@/lib/constants"
 
 export default function AllRecords() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [sortBy, setSortBy] = useState("date")
-  const [filterTag, setFilterTag] = useState("all")
-  const [allRecords, setAllRecords] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  // 使用自定义hooks
+  const { records, loading, pagination, fetchRecords } = useRecords(1)
+  const {
+    searchQuery,
+    setSearchQuery,
+    sortBy,
+    setSortBy,
+    filterTag,
+    setFilterTag,
+    filteredRecords,
+    allTags,
+  } = useRecordFilters(records)
 
-  useEffect(() => {
-    const fetchRecords = async () => {
-      try {
-        const token = document.cookie
-          .split('; ')
-          .find(row => row.startsWith('token='))
-          ?.split('=')[1];
-        
-        const response = await fetch("http://localhost:3000/records", {
-          method: "GET",
-          headers: {
-            "Authorization": "Bearer " + token
-          },
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          // 检查数据结构并处理数据格式
-          if (data && data.data && data.data.records && Array.isArray(data.data.records)) {
-            const processedRecords = data.data.records.map((record: any) => ({
-              ...record,
-              tags: record.tags 
-                ? (typeof record.tags === 'string' ? JSON.parse(record.tags) : record.tags)
-                : [],
-              content: record.snippet || record.content || '',
-              date: new Date(record.createdAt).toLocaleString('zh-CN', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-              })
-            }))
-            setAllRecords(processedRecords)
-          } else {
-            console.error('API响应数据格式错误:', data)
-            setAllRecords([])
-          }
-        }
-      } catch (error) {
-        console.error('获取记录失败:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    fetchRecords()
-  }, [])
-
-  // Get all unique tags
-  const allTags = Array.from(new Set(allRecords.flatMap((record: any) => record.tags || [])))
-
-  // Filter and sort records
-  const filteredRecords = allRecords
-    .filter((record: any) => {
-      const matchesSearch =
-        record.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        record.content?.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesTag = filterTag === "all" || record.tags?.includes(filterTag)
-      return matchesSearch && matchesTag
-    })
-    .sort((a: any, b: any) => {
-      if (sortBy === "date") {
-        return new Date(b.date).getTime() - new Date(a.date).getTime()
-      } else if (sortBy === "title") {
-        return a.title.localeCompare(b.title)
-      }
-      return 0
-    })
+  const handlePageChange = (page: number) => {
+    fetchRecords(page)
+  }
 
   if (loading) {
     return (
@@ -117,12 +53,12 @@ export default function AllRecords() {
           <div className="flex flex-col sm:flex-row gap-4">
             {/* Search */}
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-accent w-4 h-4" />
               <Input
                 placeholder="搜索记录..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 glassmorphism border-0"
+                className="pl-10 glassmorphism border-0 !backdrop-blur-none"
               />
             </div>
 
@@ -133,8 +69,11 @@ export default function AllRecords() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="date">按日期排序</SelectItem>
-                <SelectItem value="title">按标题排序</SelectItem>
+                {SORT_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -157,7 +96,8 @@ export default function AllRecords() {
 
           {/* Stats */}
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span>共 {filteredRecords.length} 条记录</span>
+            <span>共 {pagination.totalRecords} 条记录</span>
+            <span>第 {pagination.currentPage} 页，共 {pagination.totalPages} 页</span>
             {filterTag !== "all" && (
               <Badge variant="secondary" className="text-xs">
                 {filterTag}
@@ -168,16 +108,30 @@ export default function AllRecords() {
 
         {/* Records Grid */}
         <div className="grid gap-6">
-          {filteredRecords.map((record: any) => (
-            <Link key={record.id} href={`/records/${record.id}`}>
-              <Card className="glassmorphism border-0 hover:shadow-lg transition-all duration-300 cursor-pointer">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-xl font-medium text-foreground">{record.title}</CardTitle>
-                    <span className="text-2xl">{moodOptions.find(option => option.value === record.mood)?.emoji}</span>
+          {filteredRecords.map((record) => (
+            <Card key={record.id} className="glassmorphism border-0 hover:shadow-lg transition-all duration-300 group">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <Link href={`/records/${record.id}`} className="flex-1">
+                    <CardTitle className="text-xl font-medium text-foreground hover:text-primary transition-colors cursor-pointer">{record.title}</CardTitle>
+                  </Link>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{getMoodEmoji(record.mood)}</span>
+                    <Link href={`/records/${record.id}/edit`}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </Link>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                </div>
+              </CardHeader>
+              <Link href={`/records/${record.id}`}>
+                <CardContent className="space-y-4 cursor-pointer">
                   <p className="text-muted-foreground leading-relaxed">{record.content}</p>
                   <div className="flex items-center justify-between">
                     <div className="flex flex-wrap gap-2">
@@ -196,16 +150,95 @@ export default function AllRecords() {
                         </Badge>
                       ))}
                     </div>
-                    <span className="text-sm text-muted-foreground">{record.date}</span>
+                    <span className="text-sm text-muted-foreground">{formatDate(record.createdAt, true)}</span>
                   </div>
                 </CardContent>
-              </Card>
-            </Link>
+              </Link>
+            </Card>
           ))}
         </div>
 
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="flex justify-center mt-8">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      if (pagination.currentPage > 1) {
+                        handlePageChange(pagination.currentPage - 1)
+                      }
+                    }}
+                    className={pagination.currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                
+                {/* 页码显示逻辑 */}
+                {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => {
+                  // 显示逻辑：始终显示第1页、最后一页、当前页及其前后各1页
+                  const showPage = 
+                    page === 1 || 
+                    page === pagination.totalPages || 
+                    Math.abs(page - pagination.currentPage) <= 1
+                  
+                  if (!showPage) {
+                    // 显示省略号
+                    if (page === 2 && pagination.currentPage > 4) {
+                      return (
+                        <PaginationItem key={`ellipsis-${page}`}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )
+                    }
+                    if (page === pagination.totalPages - 1 && pagination.currentPage < pagination.totalPages - 3) {
+                      return (
+                        <PaginationItem key={`ellipsis-${page}`}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )
+                    }
+                    return null
+                  }
+                  
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          handlePageChange(page)
+                        }}
+                        isActive={pagination.currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                })}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      if (pagination.currentPage < pagination.totalPages) {
+                        handlePageChange(pagination.currentPage + 1)
+                      }
+                    }}
+                    className={pagination.currentPage >= pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
+
         {/* Empty State */}
-        {filteredRecords.length === 0 && (
+        {filteredRecords.length === 0 && !loading && (
           <div className="text-center py-12">
             <div className="text-muted-foreground mb-4">
               <Filter className="w-12 h-12 mx-auto mb-4 opacity-50" />

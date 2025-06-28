@@ -1,131 +1,39 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Edit, Trash2, Calendar, Tag, Heart } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { ArrowLeft, Edit, Trash2, Calendar, Tag, Heart, Paperclip, Download, ExternalLink } from "lucide-react"
 import Link from "next/link"
-import { toast } from "sonner"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-
-interface Record {
-  id: string
-  title: string
-  content: string
-  snippet: string
-  tags: string[]
-  mood: string
-  category: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-const moodOptions = [
-  { emoji: "😃", value: "兴奋", color: "bg-yellow-500" },
-  { emoji: "🤔", value: "沉思", color: "bg-blue-500" },
-  { emoji: "😢", value: "悲伤", color: "bg-gray-500" },
-  { emoji: "🚀", value: "充满希望", color: "bg-green-500" },
-  { emoji: "❓", value: "困惑", color: "bg-purple-500" },
-]
+import { useRecord, useRecordActions } from "@/hooks/use-records"
+import { formatDate, getMoodEmoji, downloadFile } from "@/lib/data-utils"
+import { MOOD_OPTIONS } from "@/lib/constants"
 
 export default function RecordDetail() {
   const params = useParams()
   const router = useRouter()
-  const [record, setRecord] = useState<Record | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchRecord = async () => {
-      try {
-        const token = document.cookie
-          .split('; ')
-          .find(row => row.startsWith('token='))
-          ?.split('=')[1];
-
-        const response = await fetch(`http://localhost:3000/records/${params.id}`, {
-          method: "GET",
-          headers: {
-            "Authorization": "Bearer " + token
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          console.log(data);
-          
-          // 检查数据结构是否完整
-          if (data.data) {
-            // 处理 tags 字段
-            const processedRecord = {
-              ...data.data,
-              tags: data.data.tags 
-                ? (typeof data.data.tags === 'string' 
-                    ? JSON.parse(data.data.tags) 
-                    : data.data.tags)
-                : []
-            }
-            setRecord(processedRecord)
-          } else {
-            toast.error("记录数据格式错误")
-          }
-        } else {
-          toast.error("记录不存在或已被删除")
-        }
-      } catch (error) {
-        console.error('获取记录失败:', error)
-        toast.error("获取记录失败")
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (params.id) {
-      fetchRecord()
-    }
-  }, [params.id, router])
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  
+  // 使用自定义hooks
+  const { record, loading, error } = useRecord(params.id as string)
+  const { deleteRecord, loading: deleting } = useRecordActions()
 
   const handleDelete = async () => {
-    if (!confirm("确定要删除这条记录吗？此操作无法撤销。")) {
-      return
-    }
-
+    if (!record) return
+    
     try {
-      const token = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('token='))
-        ?.split('=')[1];
-
-      const response = await fetch(`http://localhost:3000/records/${params.id}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": "Bearer " + token
-        },
-      })
-
-      if (response.ok) {
-        toast.success("记录已删除")
-        router.push("/records")
-      } else {
-        toast.error("删除失败")
-      }
+      await deleteRecord(record.id)
+      setDeleteDialogOpen(false)
+      router.push("/records")
     } catch (error) {
-      console.error('删除记录失败:', error)
-      toast.error("删除失败")
+      // 错误已在hook中处理
     }
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
   }
 
   if (loading) {
@@ -161,27 +69,53 @@ export default function RecordDetail() {
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-4 mb-4">
-            <Link href="/records">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                返回列表
-              </Button>
-            </Link>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => window.history.back()}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              返回上一页
+            </Button>
             <div className="flex gap-2 ml-auto">
               <Link href={`/records/${record.id}/edit`}>
                 <Button variant="outline" size="sm">
                   <Edit className="w-4 h-4 mr-2" />
-                  编辑
+                  编辑记录
                 </Button>
               </Link>
-              <Button 
-                variant="destructive" 
-                size="sm" 
-                onClick={handleDelete}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                删除
-              </Button>
+              <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    删除记录
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>确认删除记录</DialogTitle>
+                    <DialogDescription>
+                      您确定要删除记录「{record?.title}」吗？此操作无法撤销，记录及其所有附件都将被永久删除。
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setDeleteDialogOpen(false)}
+                      disabled={deleting}
+                    >
+                      取消
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      onClick={handleDelete}
+                      disabled={deleting}
+                    >
+                      {deleting ? "删除中..." : "确认删除"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
@@ -207,7 +141,7 @@ export default function RecordDetail() {
                   )}
                 </div>
               </div>
-              <div className="text-4xl">{moodOptions.find(option => option.value === record.mood)?.emoji}</div>
+              <div className="text-4xl">{getMoodEmoji(record.mood)}</div>
             </div>
           </CardHeader>
           
@@ -227,6 +161,52 @@ export default function RecordDetail() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* Attachments */}
+            {record.attachmentFiles && record.attachmentFiles.length > 0 && (
+              <>
+                <Separator />
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Paperclip className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-muted-foreground">附件</span>
+                  </div>
+                  <div className="space-y-2">
+                    {record.attachmentFiles?.map((attachment, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-primary/10 rounded-md flex items-center justify-center">
+                            <Paperclip className="w-4 h-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{attachment.fileName}</p>
+                            <p className="text-xs text-muted-foreground">附件 ID: {attachment.id}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(attachment.url, '_blank')}
+                          >
+                            <ExternalLink className="w-4 h-4 mr-1" />
+                            查看
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => downloadFile(attachment.url, attachment.fileName)}
+                          >
+                            <Download className="w-4 h-4 mr-1" />
+                            下载
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
 
             <Separator />
@@ -272,7 +252,7 @@ export default function RecordDetail() {
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-sm font-medium text-muted-foreground">分类</span>
                   </div>
-                  <Badge variant="outline">{record.category}</Badge>
+                  <Badge variant="outline">{record.category?.name || '未分类'}</Badge>
                 </div>
               </>
             )}

@@ -1,39 +1,79 @@
-'use client'
+"use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Save, Upload, Eye, Edit } from "lucide-react"
+import { ArrowLeft, Save, Eye, Edit, Paperclip, Download, ExternalLink } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { useRecordActions } from "@/hooks/use-records"
+import { useRecord, useRecordActions } from "@/hooks/use-records"
 import { useFileUpload } from "@/hooks/use-file-upload"
-import { validateRecord } from "@/lib/data-utils"
+import { validateRecord, downloadFile } from "@/lib/data-utils"
 import { MOOD_OPTIONS } from "@/lib/constants"
-import { Attachment } from "@/types"
+import type { FantasyRecord } from "@/types"
 
-export default function CreateEntry() {
+export default function EditRecord() {
+  const params = useParams()
   const router = useRouter()
+  const recordId = params.id as string
+  
+  // 使用自定义hooks
+  const { record, loading, error } = useRecord(recordId)
+  const { updateRecord, loading: saving } = useRecordActions()
+  const { uploadFiles, uploading } = useFileUpload()
+  
+  // Form states
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [tags, setTags] = useState<string[]>([])
   const [currentTag, setCurrentTag] = useState("")
   const [selectedMood, setSelectedMood] = useState("")
-  const [saveStatus, setSaveStatus] = useState("已保存")
+  const [hasChanges, setHasChanges] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   
-  // 使用自定义hooks
-  const { createRecord, loading: saving } = useRecordActions()
-  const { uploadFiles, uploading } = useFileUpload()
+  // Original data for comparison
+  const [originalData, setOriginalData] = useState<FantasyRecord | null>(null)
+
+  // 初始化表单数据
+  useEffect(() => {
+    if (record) {
+      setTitle(record.title)
+      setContent(record.content || record.snippet)
+      setTags(record.tags)
+      setSelectedMood(record.mood)
+      setOriginalData(record)
+    }
+  }, [record])
+
+  // 检查是否有变更
+  useEffect(() => {
+    if (originalData) {
+      const currentContent = content || ""
+      const originalContent = originalData.content || originalData.snippet || ""
+      
+      const hasChanged = 
+        title !== originalData.title ||
+        currentContent !== originalContent ||
+        JSON.stringify(tags.sort()) !== JSON.stringify(originalData.tags.sort()) ||
+        selectedMood !== originalData.mood
+      
+      setHasChanges(hasChanged)
+    }
+  }, [title, content, tags, selectedMood, originalData])
+
+  // 处理错误和重定向
+  useEffect(() => {
+    if (error) {
+      router.push("/records")
+    }
+  }, [error, router])
 
   const handleAddTag = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && currentTag.trim()) {
@@ -62,18 +102,14 @@ export default function CreateEntry() {
       return
     }
 
-    setSaveStatus("保存中...")
-    
     try {
       // 先上传附件
       let attachmentIds: string[] = []
       if (uploadedFiles.length > 0) {
-        setSaveStatus("上传附件中...")
         const uploadedAttachments = await uploadFiles(uploadedFiles)
         attachmentIds = uploadedAttachments.map(attachment => attachment.id)
       }
 
-      setSaveStatus("保存记录中...")
       const recordData = {
         title: title.trim(),
         content: content.trim(),
@@ -82,25 +118,12 @@ export default function CreateEntry() {
         attachments: attachmentIds
       }
 
-      await createRecord(recordData)
-      setSaveStatus("已保存")
-      router.push("/")
+      await updateRecord(recordId, recordData)
+      router.push(`/records/${recordId}`)
     } catch (error) {
-      setSaveStatus("保存失败")
       // 错误已在hook中处理
     }
   }
-
-  // Auto-save simulation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (title || content) {
-        setSaveStatus("自动保存中...")
-        setTimeout(() => setSaveStatus("已保存"), 500)
-      }
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [title, content])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -115,25 +138,41 @@ export default function CreateEntry() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [title, content, tags, selectedMood])
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">加载中...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto max-w-4xl p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <Link href="/">
+          <Link href={`/records/${params.id}`}>
             <Button variant="ghost" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              返回主页
+              返回详情
             </Button>
           </Link>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{saveStatus}</span>
+            <span className={`text-sm ${
+              hasChanges ? "text-amber-500" : "text-muted-foreground"
+            }`}>
+              {hasChanges ? "有未保存的更改" : "无更改"}
+            </span>
             <Button 
               onClick={handleSave}
-              disabled={saving || uploading || !title.trim() || !content.trim()}
+              className={hasChanges ? "glow-effect" : ""}
+              disabled={saving || !hasChanges || !title.trim() || !content.trim()}
             >
               <Save className="w-4 h-4 mr-2" />
-              {saving ? "保存中..." : "保存记录"}
+              {saving ? "保存中..." : "保存更改"}
             </Button>
           </div>
         </div>
@@ -150,10 +189,13 @@ export default function CreateEntry() {
             />
           </div>
 
-          {/* Content with Tabs */}
+          {/* Content with Markdown Support */}
           <Card className="glassmorphism border-0">
             <CardHeader>
-              <CardTitle className="text-lg">内容</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Edit className="w-5 h-5" />
+                内容编辑
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="edit" className="w-full">
@@ -167,24 +209,27 @@ export default function CreateEntry() {
                     预览
                   </TabsTrigger>
                 </TabsList>
-                <TabsContent value="edit" className="space-y-4">
+                <TabsContent value="edit" className="space-y-2">
                   <Textarea
-                    placeholder="记录你的幻想世界...支持Markdown格式"
+                    placeholder="在这里尽情描绘你的幻想世界...\n\n支持Markdown语法：\n# 标题\n**粗体** *斜体*\n- 列表项\n> 引用\n\`代码\`\n[链接](url)\n![图片](url)"
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
-                    className="min-h-[300px] glassmorphism border-0 resize-none"
+                    className="min-h-[400px] text-base leading-relaxed resize-none"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>字数: {content.length}</span>
                     <span>{content.length < 50 ? "建议至少写50个字" : "内容充实"}</span>
                   </div>
                 </TabsContent>
-                <TabsContent value="preview" className="space-y-4">
-                  <div className="min-h-[300px] p-4 glassmorphism border-0 rounded-md">
+                <TabsContent value="preview" className="space-y-2">
+                  <div className="min-h-[400px] p-4 border rounded-md bg-background">
                     {content ? (
                       <div className="prose prose-sm max-w-none dark:prose-invert">
-                        <ReactMarkdown
+                        <ReactMarkdown 
                           remarkPlugins={[remarkGfm]}
+                          disallowedElements={['script', 'iframe', 'object', 'embed', 'form', 'input', 'button']}
+                          unwrapDisallowed={true}
+                          skipHtml={true}
                           components={{
                             h1: ({children}) => <h1 className="text-2xl font-bold mb-4">{children}</h1>,
                             h2: ({children}) => <h2 className="text-xl font-semibold mb-3">{children}</h2>,
@@ -247,6 +292,56 @@ export default function CreateEntry() {
             </CardContent>
           </Card>
 
+          {/* Attachments */}
+          {originalData && originalData.attachmentFiles && originalData.attachmentFiles.length > 0 && (
+            <Card className="glassmorphism border-0">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Paperclip className="w-5 h-5" />
+                  附件
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                   {originalData.attachmentFiles?.map((attachment, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-primary/10 rounded-md flex items-center justify-center">
+                          <Paperclip className="w-4 h-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{attachment.fileName}</p>
+                          <p className="text-xs text-muted-foreground">附件 ID: {attachment.id}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(attachment.url, '_blank')}
+                        >
+                          <ExternalLink className="w-4 h-4 mr-1" />
+                          查看
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => downloadFile(attachment.url, attachment.fileName)}
+                        >
+                          <Download className="w-4 h-4 mr-1" />
+                          下载
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    注意：编辑页面暂不支持添加或删除附件，如需修改附件请重新创建记录。
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Mood Selector */}
           <Card className="glassmorphism border-0">
             <CardHeader>
@@ -266,57 +361,6 @@ export default function CreateEntry() {
                   </Button>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-
-          {/* File Upload */}
-          <Card className="glassmorphism border-0">
-            <CardHeader>
-              <CardTitle className="text-lg">附件</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
-                <Upload className="w-8 h-8 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground mb-2">上传相关附件（草图、灵感图等）</p>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*,.pdf,.doc,.docx,.txt"
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      setUploadedFiles(Array.from(e.target.files))
-                    }
-                  }}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <Button variant="outline" size="sm" onClick={() => document.getElementById('file-upload')?.click()}>
-                  选择文件
-                </Button>
-              </div>
-              {uploadedFiles.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="text-sm font-medium">已选择的文件：</p>
-                  {uploadedFiles.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{file.name}</span>
-                        <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setUploadedFiles(uploadedFiles.filter((_, i) => i !== index))
-                        }}
-                        disabled={uploading || saving}
-                      >
-                        删除
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>

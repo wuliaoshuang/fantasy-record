@@ -1,13 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { BrainCircuit, TrendingUp, Cloud, FileText, Lightbulb, Copy, Star } from "lucide-react"
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import { BrainCircuit, TrendingUp, Cloud, FileText, Lightbulb, Copy, Star, RefreshCw } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, RadialBarChart, RadialBar, Legend } from "recharts"
 
 // Mock data
 const emotionData = [
@@ -37,6 +39,72 @@ export default function AnalysisCenter() {
   const [selectedIdea, setSelectedIdea] = useState("")
   const [analysisResult, setAnalysisResult] = useState<any>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  
+  // 心理状态分析数据
+  const [mentalAnalysisData, setMentalAnalysisData] = useState<any>(null)
+  const [mentalAnalysisLoading, setMentalAnalysisLoading] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // 获取心理状态分析数据
+  const fetchMentalAnalysis = async () => {
+    try {
+      setMentalAnalysisLoading(true)
+      const token = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('token='))
+        ?.split('=')[1];
+      
+      const response = await fetch("http://localhost:3000/ai/mental-state-analysis", {
+        method: "GET",
+        headers: {
+          "Authorization": "Bearer " + token
+        },
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.data) {
+          setMentalAnalysisData(data.data)
+        }
+      }
+    } catch (error) {
+      console.error('获取心理状态分析失败:', error)
+    } finally {
+      setMentalAnalysisLoading(false)
+    }
+  }
+
+  // 手动触发AI分析
+  const triggerAnalysis = async () => {
+    try {
+      setIsRefreshing(true)
+      const token = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('token='))
+        ?.split('=')[1];
+      
+      const response = await fetch("http://localhost:3000/ai/trigger-analysis", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + token,
+          "Content-Type": "application/json"
+        },
+      })
+      
+      if (response.ok) {
+        // 触发成功后重新获取分析数据
+        await fetchMentalAnalysis()
+      }
+    } catch (error) {
+      console.error('触发AI分析失败:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchMentalAnalysis()
+  }, [])
 
   const handleAnalyze = () => {
     if (!selectedIdea) return
@@ -73,8 +141,22 @@ export default function AnalysisCenter() {
       <div className="container mx-auto p-6">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-semibold mb-2">AI 分析中心</h1>
-          <p className="text-muted-foreground">在这里，将你的幻想转化为深刻的洞察与可行的计划。</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold mb-2">AI 分析中心</h1>
+              <p className="text-muted-foreground">在这里，将你的幻想转化为深刻的洞察与可行的计划。</p>
+            </div>
+            <Button
+              onClick={triggerAnalysis}
+              disabled={isRefreshing || mentalAnalysisLoading}
+              variant="outline"
+              size="sm"
+              className="glassmorphism border-0 hover:bg-primary hover:text-primary-foreground"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? '分析中...' : '刷新分析'}
+            </Button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -103,24 +185,50 @@ export default function AnalysisCenter() {
                   <CardTitle className="flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-accent" />
                     情绪波动图 (近30天)
+                    {mentalAnalysisLoading && (
+                      <div className="w-3 h-3 border border-accent border-t-transparent rounded-full animate-spin" />
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={emotionData}>
-                        <XAxis dataKey="date" axisLine={false} tickLine={false} />
-                        <YAxis axisLine={false} tickLine={false} />
-                        <Line type="monotone" dataKey="mood" stroke="hsl(var(--primary))" strokeWidth={2} name="心情" />
-                        <Line
-                          type="monotone"
-                          dataKey="energy"
-                          stroke="hsl(var(--accent))"
-                          strokeWidth={2}
-                          name="精力"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    {mentalAnalysisLoading ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-sm text-muted-foreground">加载中...</div>
+                      </div>
+                    ) : mentalAnalysisData?.emotionChartData ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={mentalAnalysisData.emotionChartData.labels.map((label: string, index: number) => ({
+                          date: label,
+                          mood: mentalAnalysisData.emotionChartData.datasets[0].data[index]
+                        }))}>
+                          <XAxis dataKey="date" axisLine={false} tickLine={false} />
+                          <YAxis axisLine={false} tickLine={false} />
+                          <Line 
+                            type="monotone" 
+                            dataKey="mood" 
+                            stroke={mentalAnalysisData.emotionChartData.datasets[0].borderColor || "hsl(var(--primary))"} 
+                            strokeWidth={2} 
+                            name="情绪波动" 
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={emotionData}>
+                          <XAxis dataKey="date" axisLine={false} tickLine={false} />
+                          <YAxis axisLine={false} tickLine={false} />
+                          <Line type="monotone" dataKey="mood" stroke="hsl(var(--primary))" strokeWidth={2} name="心情" />
+                          <Line
+                            type="monotone"
+                            dataKey="energy"
+                            stroke="hsl(var(--accent))"
+                            strokeWidth={2}
+                            name="精力"
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -134,33 +242,53 @@ export default function AnalysisCenter() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-64 flex items-center justify-center">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={themeData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {themeData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-4">
-                    {themeData.map((item) => (
-                      <div key={item.name} className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span className="text-sm">{item.name}</span>
+                  <div className="h-64">
+                    {mentalAnalysisLoading ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-sm text-muted-foreground">加载中...</div>
                       </div>
-                    ))}
-                  </div>
+                    ) : (
+                      <div className="flex flex-col h-full">
+                        <ResponsiveContainer width="100%" height={280}>
+                          <RadialBarChart 
+                            cx="50%" 
+                            cy="50%" 
+                            innerRadius="20%" 
+                            outerRadius="90%" 
+                            data={mentalAnalysisData?.themeWordCloud && mentalAnalysisData.themeWordCloud.length > 0 
+                              ? mentalAnalysisData.themeWordCloud.slice(0, 6).map((item: any, index: number) => {
+                                  const colors = ['#4A90E2', '#50E3C2', '#F5A623', '#7ED321', '#BD10E0', '#B8E986']
+                                  return {
+                                    name: item.text,
+                                    value: item.value,
+                                    fill: colors[index % colors.length]
+                                  }
+                                })
+                              : themeData.slice(0, 6).map((item, index) => ({
+                                  name: item.name,
+                                  value: item.value,
+                                  fill: item.color
+                                }))
+                            }
+                          >
+                            <RadialBar 
+                              dataKey="value" 
+                              cornerRadius={10} 
+                              fill="#8884d8" 
+                              label={{ position: 'insideStart', fill: '#fff', fontSize: 12 }}
+                            />
+                            <Legend 
+                              iconSize={8}
+                              layout="vertical"
+                              verticalAlign="middle"
+                              align="right"
+                              wrapperStyle={{ fontSize: '12px' }}
+                            />
+                          </RadialBarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                    </div>
                 </CardContent>
               </Card>
             </div>
@@ -174,16 +302,30 @@ export default function AnalysisCenter() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="prose prose-invert max-w-none">
-                  <p className="text-muted-foreground leading-relaxed">
-                    最近，您的幻想中"科技"和"未来"两个主题经常同时出现，这反映了您对技术发展的浓厚兴趣和对未来的积极展望。
-                    从情绪数据来看，您在记录这类幻想时通常处于较高的兴奋状态，说明科技创新是您的重要动力源泉。
-                  </p>
-                  <p className="text-muted-foreground leading-relaxed">
-                    建议您可以将这些科技幻想转化为具体的学习目标或项目计划，这样既能保持创造力，又能将想象力转化为实际行动。
-                    同时，建议适当平衡工作与休息，在追求创新的同时关注内心的平静与和谐。
-                  </p>
-                </div>
+                {mentalAnalysisLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-sm text-muted-foreground">生成报告中...</div>
+                  </div>
+                ) : mentalAnalysisData?.summaryReport ? (
+                  <div className="prose dark:prose-invert max-w-none leading-relaxed">
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                    >
+                      {mentalAnalysisData.summaryReport}
+                    </ReactMarkdown>
+                  </div>
+                ) : (
+                  <div className="prose dark:prose-invert max-w-none">
+                    <p className="text-muted-foreground leading-relaxed">
+                      最近，您的幻想中"科技"和"未来"两个主题经常同时出现，这反映了您对技术发展的浓厚兴趣和对未来的积极展望。
+                      从情绪数据来看，您在记录这类幻想时通常处于较高的兴奋状态，说明科技创新是您的重要动力源泉。
+                    </p>
+                    <p className="text-muted-foreground leading-relaxed">
+                      建议您可以将这些科技幻想转化为具体的学习目标或项目计划，这样既能保持创造力，又能将想象力转化为实际行动。
+                      同时，建议适当平衡工作与休息，在追求创新的同时关注内心的平静与和谐。
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
