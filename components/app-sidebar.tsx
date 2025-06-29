@@ -83,7 +83,7 @@ export function AppSidebar() {
         return
       }
 
-      const response = await fetch('http://localhost:3000/auth/profile', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/auth/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

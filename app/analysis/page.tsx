@@ -10,6 +10,7 @@ import { BrainCircuit, TrendingUp, Cloud, FileText, Lightbulb, Copy, Star, Refre
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, RadialBarChart, RadialBar, Legend } from "recharts"
+import { SmallLoading } from "@/components/ui/loading"
 
 // Mock data
 const emotionData = [
@@ -54,7 +55,7 @@ export default function AnalysisCenter() {
         .find(row => row.startsWith('token='))
         ?.split('=')[1];
       
-      const response = await fetch("http://localhost:3000/ai/mental-state-analysis", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/ai/mental-state-analysis`, {
         method: "GET",
         headers: {
           "Authorization": "Bearer " + token
@@ -83,7 +84,7 @@ export default function AnalysisCenter() {
         .find(row => row.startsWith('token='))
         ?.split('=')[1];
       
-      const response = await fetch("http://localhost:3000/ai/trigger-analysis", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/ai/trigger-analysis`, {
         method: "POST",
         headers: {
           "Authorization": "Bearer " + token,
@@ -194,7 +195,7 @@ export default function AnalysisCenter() {
                   <div className="h-64">
                     {mentalAnalysisLoading ? (
                       <div className="flex items-center justify-center h-full">
-                        <div className="text-sm text-muted-foreground">加载中...</div>
+                        <SmallLoading text="" />
                       </div>
                     ) : mentalAnalysisData?.emotionChartData ? (
                       <ResponsiveContainer width="100%" height="100%">
@@ -245,7 +246,7 @@ export default function AnalysisCenter() {
                   <div className="h-64">
                     {mentalAnalysisLoading ? (
                       <div className="flex items-center justify-center h-full">
-                        <div className="text-sm text-muted-foreground">加载中...</div>
+                        <SmallLoading text="" />
                       </div>
                     ) : (
                       <div className="flex flex-col h-full">

@@ -11,6 +11,7 @@ import Link from "next/link"
 import { useRecords, useRecordFilters } from "@/hooks/use-records"
 import { formatDate, getMoodEmoji } from "@/lib/data-utils"
 import { SORT_OPTIONS } from "@/lib/constants"
+import { Loading, RecordListSkeleton } from "@/components/ui/loading"
 
 export default function AllRecords() {
   // 使用自定义hooks
@@ -32,9 +33,13 @@ export default function AllRecords() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex justify-center items-center h-64">
-          <div className="text-lg text-gray-600">加载中...</div>
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto p-6 space-y-6">
+          <div className="flex flex-col space-y-4">
+            <h1 className="text-3xl font-bold text-gray-200">所有记录</h1>
+            <p className="text-gray-600">浏览和搜索你的所有幻想记录</p>
+          </div>
+          <RecordListSkeleton count={5} />
         </div>
       </div>
     )

@@ -9,52 +9,57 @@ interface FontSizeContextType {
 
 const FontSizeContext = createContext<FontSizeContextType | undefined>(undefined)
 
+// 获取保存的字体大小，但不立即应用到DOM
+const getInitialFontSize = () => {
+  if (typeof window !== 'undefined') {
+    try {
+      const savedSettings = localStorage.getItem('fantasy-record-settings')
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings)
+        return settings.fontSize || 16
+      }
+    } catch (error) {
+      console.error('Failed to load font size setting:', error)
+    }
+  }
+  return 16
+}
+
 export function FontSizeProvider({ children }: { children: React.ReactNode }) {
-  const [fontSize, setFontSizeState] = useState(16)
+  const [fontSize, setFontSizeState] = useState(getInitialFontSize)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    // 从localStorage加载字体大小设置
-    const savedSettings = localStorage.getItem('fantasy-record-settings')
-    if (savedSettings) {
-      try {
-        const settings = JSON.parse(savedSettings)
-        if (settings.fontSize && settings.fontSize !== fontSize) {
-          setFontSizeState(settings.fontSize)
-        }
-      } catch (error) {
-        console.error('Failed to load font size setting:', error)
-      }
-    }
+    // 只在客户端挂载后应用字体大小
+    const currentFontSize = getInitialFontSize()
+    document.documentElement.style.fontSize = `${currentFontSize}px`
+    document.body.style.fontSize = `${currentFontSize}px`
   }, [])
 
   const setFontSize = (size: number) => {
+    // 立即应用字体大小
+    if (typeof window !== 'undefined') {
+      document.documentElement.style.fontSize = `${size}px`
+      document.body.style.fontSize = `${size}px`
+    }
+    
     setFontSizeState(size)
+    
     // 同时更新localStorage中的设置
-    const savedSettings = localStorage.getItem('fantasy-record-settings')
-    try {
-      const settings = savedSettings ? JSON.parse(savedSettings) : {}
-      settings.fontSize = size
-      localStorage.setItem('fantasy-record-settings', JSON.stringify(settings))
-    } catch (error) {
-      console.error('Failed to save font size setting:', error)
+    if (typeof window !== 'undefined') {
+      const savedSettings = localStorage.getItem('fantasy-record-settings')
+      try {
+        const settings = savedSettings ? JSON.parse(savedSettings) : {}
+        settings.fontSize = size
+        localStorage.setItem('fantasy-record-settings', JSON.stringify(settings))
+      } catch (error) {
+        console.error('Failed to save font size setting:', error)
+      }
     }
   }
 
-  // 应用字体大小到document根元素
-  useEffect(() => {
-    if (mounted && typeof window !== 'undefined') {
-      // 设置根元素字体大小
-      document.documentElement.style.fontSize = `${fontSize}px`
-      // 同时设置body的字体大小以确保全局生效
-      document.body.style.fontSize = `${fontSize}px`
-    }
-  }, [fontSize, mounted])
 
-  if (!mounted) {
-    return <>{children}</>
-  }
 
   return (
     <FontSizeContext.Provider value={{ fontSize, setFontSize }}>
@@ -66,6 +71,10 @@ export function FontSizeProvider({ children }: { children: React.ReactNode }) {
 export function useFontSize() {
   const context = useContext(FontSizeContext)
   if (context === undefined) {
+    // 在服务端渲染时提供默认值，避免抛出错误
+    if (typeof window === 'undefined') {
+      return { fontSize: 16, setFontSize: () => {} }
+    }
     throw new Error('useFontSize must be used within a FontSizeProvider')
   }
   return context

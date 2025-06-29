@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, Search, TrendingUp, Lightbulb, Calendar, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from "recharts"
+import { SmallLoading, HomePageSkeleton } from "@/components/ui/loading"
 // import { useGetCookies } from "cookies-next"
 
 // 默认心情数据（作为fallback）
@@ -60,6 +61,7 @@ export default function Dashboard() {
     topTags: []
   })
   const [summaryLoading, setSummaryLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
 
   // 获取心情趋势数据
   const fetchMoodTrend = async () => {
@@ -70,7 +72,7 @@ export default function Dashboard() {
         .find(row => row.startsWith('token='))
         ?.split('=')[1];
       
-      const response = await fetch("http://localhost:3000/analytics/mood-trend", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/analytics/mood-trend`, {
         method: "GET",
         headers: {
           "Authorization": "Bearer " + token
@@ -105,7 +107,7 @@ export default function Dashboard() {
         .find(row => row.startsWith('token='))
         ?.split('=')[1];
       
-      const response = await fetch("http://localhost:3000/analytics/records-summary", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/analytics/records-summary`, {
         method: "GET",
         headers: {
           "Authorization": "Bearer " + token
@@ -139,7 +141,7 @@ export default function Dashboard() {
           .find(row => row.startsWith('token='))
           ?.split('=')[1];
         
-        const response = await fetch("http://localhost:3000/records", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/records`, {
           method: "GET",
           headers: {
             "Authorization": "Bearer " + token
@@ -168,6 +170,8 @@ export default function Dashboard() {
         }
       } catch (error) {
         console.error('获取记录失败:', error)
+      } finally {
+        setInitialLoading(false)
       }
     }
     
@@ -183,6 +187,11 @@ export default function Dashboard() {
     const matchesFilter = activeFilter === "全部" || record.tags?.includes(activeFilter)
     return matchesSearch && matchesFilter
   })
+
+  // 如果正在初始加载，显示骨架屏
+  if (initialLoading) {
+    return <HomePageSkeleton />
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -378,7 +387,7 @@ export default function Dashboard() {
                 <div className="h-32">
                   {moodDataLoading ? (
                     <div className="flex items-center justify-center h-full">
-                      <div className="text-sm text-muted-foreground">加载中...</div>
+                      <SmallLoading text="" />
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
@@ -409,7 +418,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {summaryLoading ? (
-                  <div className="text-sm text-muted-foreground">加载中...</div>
+                  <SmallLoading text="" />
                 ) : summaryData.topTags && summaryData.topTags.length > 0 ? (
                   <div className="space-y-2">
                     {summaryData.topTags.slice(0, 5).map((tagItem: any, index: number) => (
@@ -446,7 +455,7 @@ export default function Dashboard() {
               <CardContent className="space-y-3">
                 {summaryLoading ? (
                   <div className="flex items-center justify-center py-4">
-                    <div className="text-sm text-muted-foreground">加载中...</div>
+                    <SmallLoading text="" />
                   </div>
                 ) : (
                   <>

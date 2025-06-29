@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "@/hooks/use-toast"
 import { Settings, Moon, Bell, Database, Shield, Palette, Save, Download, Trash2 } from "lucide-react"
+import { SettingsSkeleton } from "@/components/ui/loading"
 
 // 设置接口定义
 interface AppSettings {
@@ -169,9 +170,7 @@ export default function SettingsPage() {
   }
 
   if (!mounted) {
-    return <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="text-muted-foreground">加载中...</div>
-    </div>
+    return <SettingsSkeleton />
   }
 
   return (

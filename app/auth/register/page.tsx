@@ -56,7 +56,7 @@ function Register() {
 
     const { confirmPassword, ...submitData } = data;
 
-    fetch("http://localhost:3000/auth/register", {
+    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/auth/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

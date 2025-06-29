@@ -1,7 +1,5 @@
+import { FullScreenLoading } from "@/components/ui/loading"
+
 export default function Loading() {
-  return (
-    <div>
-      加载中...
-    </div>
-  )
+  return <FullScreenLoading />
 }

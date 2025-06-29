@@ -45,7 +45,7 @@ function Login() {
   function onSubmit(data: z.infer<typeof FormSchema>) {
   console.log("表单验证通过，提交数据:", data);
 
-  fetch("http://localhost:3000/auth/login", {
+  fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
