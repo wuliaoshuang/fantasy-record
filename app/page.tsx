@@ -72,7 +72,7 @@ export default function Dashboard() {
         .find(row => row.startsWith('token='))
         ?.split('=')[1];
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/analytics/mood-trend`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/analytics/mood-trend`, {
         method: "GET",
         headers: {
           "Authorization": "Bearer " + token
@@ -107,7 +107,7 @@ export default function Dashboard() {
         .find(row => row.startsWith('token='))
         ?.split('=')[1];
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/analytics/records-summary`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/analytics/records-summary`, {
         method: "GET",
         headers: {
           "Authorization": "Bearer " + token
@@ -141,7 +141,7 @@ export default function Dashboard() {
           .find(row => row.startsWith('token='))
           ?.split('=')[1];
         
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/records`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/records`, {
           method: "GET",
           headers: {
             "Authorization": "Bearer " + token

@@ -24,7 +24,7 @@ export const getAuthToken = (): string | null => {
 }
 
 // API基础配置
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
 
 // 通用API请求函数
 export const apiRequest = async <T>(

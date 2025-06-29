@@ -55,7 +55,7 @@ export default function AnalysisCenter() {
         .find(row => row.startsWith('token='))
         ?.split('=')[1];
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/ai/mental-state-analysis`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/ai/mental-state-analysis`, {
         method: "GET",
         headers: {
           "Authorization": "Bearer " + token
@@ -84,7 +84,7 @@ export default function AnalysisCenter() {
         .find(row => row.startsWith('token='))
         ?.split('=')[1];
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/ai/trigger-analysis`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/ai/trigger-analysis`, {
         method: "POST",
         headers: {
           "Authorization": "Bearer " + token,
